@@ -169,6 +169,41 @@ FUngsi ini diawali dengan ```clear``` lalu dilakuakn beberapa inisialisasi, sepe
         speeds[$i]=$((RANDOM % 3 + 1))    # Kecepatan acak (1-3)
     done
 ```
+Setelah itu, fungsi while dijalankan dengan inisialisasi yang sudah dibuat sebelumnya.
+```
+    while true; do
+        # Bersihkan layar
+        clear
+
+        # Tampilkan simbol mata uang untuk setiap kolom
+        for ((i = 0; i < cols; i++)); do
+            # Pilih simbol mata uang acak
+            currency=${currencies[$RANDOM % ${#currencies[@]}]}
+
+            # Pilih warna acak
+            colors=("$RED" "$GREEN" "$YELLOW" "$BLUE" "$CYAN" "$PURPLE")
+            color=${colors[$RANDOM % ${#colors[@]}]}
+
+            # Tampilkan simbol mata uang di posisi yang sesuai
+            tput cup ${positions[$i]} $i
+            echo -ne "${color}${currency}${NC}"
+
+            # Update posisi untuk efek jatuh
+            positions[$i]=$((positions[$i] + 1))
+
+            # Jika posisi melebihi jumlah baris, reset ke atas
+            if [ ${positions[$i]} -ge $rows ]; then
+                positions[$i]=0
+            fi
+        done
+
+        # Tunggu sebentar sebelum memperbarui
+        sleep 0.1
+    done
+```
+Untuk output-nya sebagai berikut. Untuk menghentikan proses ini cukup tekan ```ctrl + c``` pada keyboard.
+
+https://github.com/user-attachments/assets/c5e9a45b-11b7-4e0a-96a9-1a144c963f95
 
 ### E. Fungsi ```Brain Damage```
 Untuk fungsi ini diawali dengan ```clear```, lalu inisialisasi warna teks sebagai berikut.
@@ -203,7 +238,47 @@ Setelah itu, fungsi while dijalankan dengan update setiap detiknya. Untuk kodeny
         # Tunggu 1 detik sebelum update
         sleep 1
     done
-````
+```
 Dimana pada ```ps -eo``` fungsi akan memanggil data berupa ```pid,user,%cpu,%mem,%comm```. Lalu untuk funggi ```head -n 11``` berfungsi untuk menampilkan output header + 10 baris proses terbesar. Untuk menghentikan proses ini cukup tekan ```ctrl + c``` pada keyboard.
 Untuk output-nya sebagai berikut.
+
 https://github.com/user-attachments/assets/d17ff3da-4beb-494f-9402-da47eea20dbc
+
+### F. Best case
+Untuk best case akan menggunakan kode sebagai berikut.
+```
+if [ $# -lt 1 ]; then
+    echo "Usage: ./dsotm.sh --play=<program_name>"
+    exit 1
+fi
+```
+Untuk outputnya sebagai berikut.
+![Image](https://github.com/user-attachments/assets/3805dd50-8c4b-470a-92f2-13d31f1a1354)
+
+G. Argumen Utama
+Untuk fungsi ini, kode diperlukan sebagai berikut/
+```
+for arg in "$@"; do
+    case "$arg" in
+        (--play="Speak to Me")
+            speak_to_me
+            ;;
+        (--play="On the Run")
+            on_the_run
+            ;;
+        (--play="Time and Date")
+            time_and_date
+            ;;
+        (--play="Money")
+            Money
+            ;;
+        (--play="Brain Damage")
+            Brain_Damage
+        (*)
+            echo "Program tidak dikenal: $arg"
+            exit 1
+            ;;
+    esac
+done
+```
+Dimana setiap input yang kita masukkan akan masuk ke salah satu list sesuai input. Contoh: ```./dsotm.sh --play="Speak to Me"```. Jika input yang dijalankan berbeda dari kode di atas, maka muncul teks ```Program tidak dikenal: $arg``` dimana ```$arg``` merupakan argumen yang di-input oleh user.
