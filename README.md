@@ -1,11 +1,11 @@
 ## Soal_4
 
-### Variabel Input
+### A. Variabel Input
 Dalam membaca input user, diperlukan sebuah inisialisasi variabel dengan format sebagai berikut.
 ```
 $0 $1 $2 $3
 ```
-Dimana
+dimana
 
 1. ```$0``` Merupakan kode eksekusi program, seperti  ```./pokemon_analysis.sh```
 
@@ -19,11 +19,11 @@ sehingga contoh penggunaan command sebagai berikut.
 ```
 
 
-### Fungsi ```--help``` atau ```-h```
+### B. Fungsi ```--help``` atau ```-h```
 Fungsi ini untuk mencetak sebuah tampilan yang memudahkan user untuk mengetahui bagaimana cara menggunakan file tersebut.
 
 
-### Fungsi ```--info```
+### C. Fungsi ```--info```
 Fungsi ```--info``` berfungsi untuk memberikan informasi berupa pokemon dengan usage dan RawUsage tertinggi.
 ```
   awk -F "," '
@@ -35,7 +35,7 @@ Fungsi ```--info``` berfungsi untuk memberikan informasi berupa pokemon dengan u
   {if ($3 >= rawusage_num && NR>=2) rawusage_num = $3; rawusage = $1} 
   END { print " User dengan usage paling tinggi = ", usage, "dengan", usage_num,"\n", "User dengan RawUsage tertinggi =", rawusage, "dengan", rawusage_num}' $file
 ```
-Dimana
+dimana
 1. ```BEGIN{...}``` untuk setting variabel awal, yaitu pokemon dan usage/rawUsage.
 2. Fungsi dibawah ini untuk mencari data maksimum.
    ```
@@ -46,7 +46,7 @@ Dimana
 3. Untuk fungsi awk ```END{...}``` digunakan untuk mencetak output hasil akumulasi.
 
 
-### Fungsi ```--sort```
+### D. Fungsi ```--sort```
 Fungsi ini digunakan untuk menyortir data berdasarkan kolom tertentu.
 ```
 function show_sort()
@@ -84,18 +84,14 @@ function show_sort()
   
   A. ```case $column in``` untuk mengambil data user berupa column
   
-  B. ```
-     ("pokemon") tail -n +2 "$file" | sort -t, -k1,1 -nr ;;
-     ```
-     
-  C. ```("pokemon")``` merupakan penyortiran data berdasarkan nama.
+  B. ```("pokemon")``` merupakan penyortiran data berdasarkan nama.
   
-  D. ```tail -n +2 "$file"``` merupakan pencetakan data dari ```$file```, dengan +2 agar data header tidak ikut dicetak. 
+  C. ```tail -n +2 "$file"``` merupakan pencetakan data dari ```$file```, dengan +2 agar data header tidak ikut dicetak. 
   
-  E. ```| sort -t, -k1,1 -nr``` merupakan penyortiran dengan: ```-t,``` jeda menggunakan tanda koma, ```-k1,1``` merupakan penyortiran berdasarkan kolom pertama, dan ```-nr``` merupakan penyortiran data dilakukan secara descemnding.
+  D. ```| sort -t, -k1,1 -nr``` merupakan penyortiran dengan: ```-t,``` jeda menggunakan tanda koma, ```-k1,1``` merupakan penyortiran berdasarkan kolom pertama, dan ```-nr``` merupakan penyortiran data dilakukan secara descemnding.
 
 
-### Fungsi ```--grep```
+### E. Fungsi ```--grep```
 Untuk fungsi berikut
 ```
 function search_pokemon()
@@ -113,7 +109,7 @@ dimana:
    
 3. ```grep -i "^$name," $file``` merupakan pencarian denan ```-i``` sebagai case-insensitive (tidak membedakan huruf besar/kecil).
 
-### Fungsi ```-f``` dan ```--filter```
+### F. Fungsi ```-f``` dan ```--filter```
 ```
 function type_filter()
 {
@@ -128,5 +124,42 @@ function type_filter()
  ```
 1. ```file=$1``` merupakan inisialiasi file csv.
 2. ```search=$2``` merupakan inisialisasi pencarian yang diinginkan.
-3. 
-   
+3. ```awk -F,``` merupakan fungsi awk dengan koma sebagai pemisah.
+4. ``` -v search="$search"``` merupakan fungsi agar mengambil sebuah variabel dari shell dan dimasukkan ke dalam fungsi awk.
+5. ```'tolower($4) == tolower(search) || tolower($5) == tolower(search)'``` merupakan fungsi jika type yang dicari ada pada kolom 4 atau 5 secara case-insensitive.
+6. ```sort -k1``` merupakan penyortiran berdasarkan nama pokemon.
+
+
+### G. Fungsi ```case $command in```
+1. Fungsi ```"-h"|"--help"```
+   ```
+     "-h"|"--help")
+    show_help
+    ;;
+   ```
+   Dari salah satu fungsi merupakan jika input user ```-h``` atau ```--help``` maka akan menjalankan fungsi ```show_help```.
+
+2. Fungsi ```--sort```
+    ```
+     "--sort")
+    if [ -z "$column" ]; then 
+      echo "Input yang anda masukkan salah" 
+      exit 1
+    fi
+      show_sort
+    ;;
+   ```
+   Untuk fungsi ```--sort``` pada ```if [ -z "$column" ];``` merupakan case dimana jika input ```$column``` tidak ada, maka muncul pesan ```"Input yang anda masukkan salah"```, jika tidak maka akan menjalankan fungsi ```show_sort```.
+
+3. Fungsi ```--grep```
+   ```
+     "--grep")
+    if [ $# -lt 3 ]; then 
+      echo "Kata yang anda cari tidak dimasukkan. Coba lagi"
+      exit 1
+    fi
+       search_pokemon $file $3
+    ;
+   ```
+   pada fungsi ```--grep```, jika input kurang dari 3, misal ```./pokemon_analysis.sh pokemon_usage.csv --grep``` maka muncul pesan ```Kata yang anda cari tidak dimasukkan. Coba lagi```, jika tidak akan menjalankan fungsi ```search_pokemon``` dengan input ```$file``` sebagai ```$1``` dan ```$3``` sebagi ```$2```.
+
