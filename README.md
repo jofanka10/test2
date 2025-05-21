@@ -164,8 +164,8 @@ function type_filter()
    pada fungsi ```--grep```, jika input kurang dari 3, misal ```./pokemon_analysis.sh pokemon_usage.csv --grep``` maka muncul pesan ```Kata yang anda cari tidak dimasukkan. Coba lagi```, jika tidak akan menjalankan fungsi ```search_pokemon``` dengan input ```$file``` sebagai ```$1``` dan ```$3``` sebagi ```$2```.
 
 ## soal_1
-Pada soal ini, program dminta untuk mengubah file txt hexadecimal menjadi sebuah gambar.
-### a. Hex to Byte COnverter
+Pada soal ini, program diminta untuk mengubah file txt hexadecimal menjadi sebuah gambar.
+### a. Hex to Byte Converter
 Fungsi ini digunakan untuk mengubah string hexadecimal menjadi format biner (byte). Untuk kodenya seperti ini
 ```
 unsigned char hex_byte_converter(const char *hex) {
@@ -300,3 +300,23 @@ Dimana untuk cara kerjanya sebagai berikut.
 6. Program memuat seluruh konten file heksadesimal ke dalam memori untuk pemrosesan lebih lanjut, dan kemudian menutup file tersebut.
 7. Program membersihkan data heksadesimal yang telah dibaca dari file (`hex_data`) dengan menghapus semua karakter newline (`\n`) dan carriage return (`\r`).
 8. Setelah itu, memori yang berisi hex_data dibersihkan untuk emnghindari terjadinya memory leak.
+9. Program memvalidasi panjang string heksadesimal.
+10. Jika panjangnya ganjil, menandakan format tidak valid (karena 2 karakter hex = 1 byte biner), sehingga program akan muncul pesan `!! Hex length ganjil, tidak valid: %s`.
+11. Fungsi menghitung ukutan data biner yang akan dihasilkan (setengah dari panjang hex) dan mengalokasikan memori yang diperlukan untuk menyimpannya.
+12. menggunakan for loop, fugnsi ini menjalankan fungsi lain, yaitu fungsi `hex_byte_converter` pada poin a.
+13. Lalu, fugnsi membuat folder image di dalam source_dir.
+14. Jika gagal, maka muncul pesan error berupa `Gagal membuat folder image`.
+15. Setelah itu, fungsi mengekstrak nama dasar file dari sebuah path lengkap.
+16. Jika nama dasarnya tidak null, maka pointer `base_name` akan digeser saru posisi kedepan, melewati karakter `/` terakhir.
+17. Jika nama dasarnya bernilai `NULL`, maka file tersebut sudah merupakan file dasar.
+18. Kode ini mengekstraksi bagian nama file dari variabel base_name (yang sudah berisi nama file tanpa path direktori) hingga karakter titik (.) pertama ditemukan. Hasilnya disimpan di name_part.
+19. Selanjutnya, fungsi mendapatkan waktu dan tanggal sistem saat ini.
+20. Kemudian, fungsi membuat nama file lengkap untuk gambar output. Nama ini akan menggabungkan path direktori gambar `image_dir`), `name_part`, dan timestamp (tahun, bulan, hari, jam, menit, detik) ke dalam format `[direktori_image]/[nama_file]_image_[YYYY-MM-DD_HH-MM-SS].png`.
+21. Fungsi ini mencoba membuka file output dengan nama yang telah dibuat dalam mode tulis biner ("wb").
+22. Jika file output berhasil dibuka:
+    - Data biner yang sudah dikonversi (bin_data) ditulis ke file gambar.
+    - File gambar kemudian ditutup.
+    -= Kode mencoba membuka file log bernama conversion.log (di dalam source_dir) dalam mode append ("a").
+    - Jika file log berhasil dibuka, sebuah entri log yang berisi timestamp dan detail konversi (file input dan file output) ditulis ke dalamnya, lalu file log ditutup.
+23. Jika file output gagal dibuka, pesan kesalahan akan dicetak ke konsol.
+24. Terakhir, memori yang dialokasikan untuk `bin_data` dibebaskan.
