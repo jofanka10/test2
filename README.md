@@ -394,3 +394,81 @@ dimana untuk cara kerjanya sebagai berikut.
 4. Jika `stat()` berhasil, fungsi memeriksa apakah itu file biasa. Jika ya, atributnya diatur sebagai file dengan izin hanya baca (`0444`) dan ukurannya disalin.
 5. Jika itu direktori, atributnya diatur sebagai direktori dengan izin `0755`.
 6. Jika atribut berhasil ditentukan, fungsi mengembalikan 0 (berhasil). Jika tipe entri tidak didukung atau ada masalah lain, fungsi mengembalikan `-ENOENT`.
+
+### f. `x_readdir()`
+Fungsi ini digunakan untuk membaca sebuah direktori dalam FUSE. Untuk kodenya seperti ini
+```
+static int x_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
+                     off_t offset, struct fuse_file_info *fi,
+                     enum fuse_readdir_flags flags)
+{
+    (void) offset;
+    (void) fi;
+    (void) flags;
+
+    if (strcmp(path, "/") != 0)
+        return -ENOENT;
+
+    filler(buf, ".", NULL, 0, 0);
+    filler(buf, "..", NULL, 0, 0);
+
+    DIR *dp = opendir(source_dir);
+    if (!dp)
+        return -errno;
+
+    struct dirent *de;
+    while ((de = readdir(dp)) != NULL) {
+        struct stat st;
+        memset(&st, 0, sizeof(st));
+
+        if (de->d_type == DT_DIR)
+            st.st_mode = S_IFDIR | 0755;
+        else if (de->d_type == DT_REG)
+            st.st_mode = S_IFREG | 0444;
+        else
+            st.st_mode = S_IFREG | 0444;
+
+        filler(buf, de->d_name, &st, 0, 0);
+    }
+
+    closedir(dp);
+    return 0;
+}
+```
+dimana untuk cara kerjanya sebagai berikut.
+1. Fungsi memastikan path yang diminta adalah direktori root (`/`). Jika bukan, fungsi akan mengembalikan `-ENOENT`.
+2. Fungsi menambahkan entri `.` (direktori saat ini) dan `..` (direktori induk) ke buffer daftar direktori.
+3. Fungsi membuka direktori source_dir (direktori fisik yang dipetakan oleh FUSE) untuk membaca isinya. Jika gagal, fungsi mengembalikan error.
+4. Fungsi mengulang setiap entri di `source_dir`. Untuk setiap entri, fungsi menentukan apakah itu direktori atau file biasa, menetapkan izin yang sesuai (`0755` untuk direktori, `0444` untuk file), dan menambahkannya ke buffer daftar direktori yang akan ditampilkan ke pengguna.
+5. Setelah semua entri dibaca, fungsi menutup direktori sumber.
+6. Fungsi mengembalikan `0` jika operasi berhasil.
+
+### g. `fs_open()`
+Fungsi ini berfungsi tidak hanya "membuka" file dalam arti tradisional, tetapi juga mengintegrasikan logika konversi heksadesimal ke gambar. Untuk kodenya seperti ini
+```
+static int fs_open(const char *path, struct fuse_file_info *fi) {
+    char fullpath[PATH_MAX];
+    snprintf(fullpath, sizeof(fullpath), "%s%s", source_dir, path);
+
+    printf("[open] path=%s, realpath=%s\n", path, fullpath);
+
+    int fd = open(fullpath, O_RDONLY);
+    if (fd == -1) return -ENOENT;
+    close(fd);
+
+    if (!is_converted(fullpath)) {
+        convert_to_image(fullpath);
+        mark_converted(fullpath);
+    }
+
+    return 0;
+}
+```
+dimana untuk cara kerjanya seperti ini.
+1. Fungsi menggabungkan source_dir dan path FUSE untuk mendapatkan jalur file yang sebenarnya di sistem file fisik.
+2. Fungsi mencoba membuka file fisik dalam mode hanya-baca.
+3. Jika file tidak ada atau gagal dibuka, fungsi mengembalikan error berupa `-ENOENT`.
+4. File segera ditutup kembali karena tujuan utama open FUSE ini bukan untuk menyimpan file descriptor.
+5. Fungsi memeriksa apakah file sudah dikonversi menggunakan fungsi `is_converted()`.
+6. ika belum dikonversi, fungsi memanggil fungsi `convert_to_image()` untuk mengubah konten heksadesimal file menjadi gambar. Setelah konversi, file tersebut ditandai sebagai sudah dikonversi menggunakan `mark_converted()`.
+7. Fungsi mengembalikan `0` untuk menandakan bahwa operasi pembukaan file berhasil.
