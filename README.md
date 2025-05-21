@@ -163,3 +163,140 @@ function type_filter()
    ```
    pada fungsi ```--grep```, jika input kurang dari 3, misal ```./pokemon_analysis.sh pokemon_usage.csv --grep``` maka muncul pesan ```Kata yang anda cari tidak dimasukkan. Coba lagi```, jika tidak akan menjalankan fungsi ```search_pokemon``` dengan input ```$file``` sebagai ```$1``` dan ```$3``` sebagi ```$2```.
 
+## soal_1
+Pada soal ini, program dminta untuk mengubah file txt hexadecimal menjadi sebuah gambar.
+### a. Hex to Byte COnverter
+Fungsi ini digunakan untuk mengubah string hexadecimal menjadi format biner (byte). Untuk kodenya seperti ini
+```
+unsigned char hex_byte_converter(const char *hex) {
+    unsigned char byte;
+    sscanf(hex, "%2hhx", &byte);
+    return byte;
+}
+```
+Dimana fungsi akan mengconvert dengan kode 
+```
+sscanf(hex, "%2hhx", &byte);
+```
+lalu mengembalikan nilai berupa kode biner.
+
+### b. Fungsi convert to Image
+Fungsi ini digunakan untuk mengubah text menjadi gambar. Untuk kodenya seperti ini.
+```
+void convert_to_image(const char *filename) {
+    printf(">> Memproses file: %s\n", filename);
+
+    FILE *input = fopen(filename, "r");
+    if (!input) {
+        perror("Gagal membuka file input");
+        return;
+    }
+
+    fseek(input, 0, SEEK_END);
+    long length = ftell(input);
+    rewind(input);
+
+    if (length <= 0) {
+        printf("!! File kosong: %s\n", filename);
+        fclose(input);
+        return;
+    }
+
+    char *hex_data = malloc(length + 1);
+    fread(hex_data, 1, length, input);
+    hex_data[length] = '\0';
+    fclose(input);
+
+    // Hapus semua newline dan carriage return
+    char *clean_hex = malloc(length + 1);
+    int j = 0;
+    for (int i = 0; i < length; i++) {
+        if (hex_data[i] != '\n' && hex_data[i] != '\r') {
+            clean_hex[j++] = hex_data[i];
+        }
+    }
+    clean_hex[j] = '\0';
+    free(hex_data);
+
+    size_t hex_len = strlen(clean_hex);
+    if (hex_len % 2 != 0) {
+        printf("!! Hex length ganjil, tidak valid: %s\n", filename);
+        free(clean_hex);
+        return;
+    }
+
+    size_t bin_len = hex_len / 2;
+    unsigned char *bin_data = malloc(bin_len);
+    if (!bin_data) {
+        free(clean_hex);
+        return;
+    }
+
+    for (size_t i = 0; i < bin_len; i++) {
+        bin_data[i] = hex_byte_converter(&clean_hex[i * 2]);
+    }
+    free(clean_hex);
+
+    // Buat folder image di dalam source_dir
+    char image_dir[PATH_MAX];
+    snprintf(image_dir, sizeof(image_dir), "%s/image", source_dir);
+    struct stat st = {0};
+    if (stat(image_dir, &st) == -1) {
+        if (mkdir(image_dir, 0755) == -1) {
+            perror("Gagal membuat folder image");
+            free(bin_data);
+            return;
+        }
+    }
+
+    // Ambil nama file tanpa path dan ekstensi
+    const char *base_name = strrchr(filename, '/');
+    base_name = base_name ? base_name + 1 : filename;
+
+    char name_part[128];
+    sscanf(base_name, "%[^.]", name_part);
+
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+
+    char output_filename[PATH_MAX];
+    snprintf(output_filename, sizeof(output_filename),
+        "%s/%s_image_%04d-%02d-%02d_%02d-%02d-%02d.png",
+        image_dir, name_part,
+        tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+        tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+    FILE *output = fopen(output_filename, "wb");
+    if (output) {
+        fwrite(bin_data, 1, bin_len, output);
+        fclose(output);
+
+    char log_path[PATH_MAX];
+    snprintf(log_path, sizeof(log_path), "%s/conversion.log", source_dir);
+    FILE *log = fopen(log_path, "a");
+        if (log) {
+            fprintf(log, "[%04d-%02d-%02d][%02d:%02d:%02d]: Successfully converted hexadecimal text %s to %s.\n",
+                tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+                tm.tm_hour, tm.tm_min, tm.tm_sec,
+                filename, output_filename);
+            fclose(log);
+        }
+
+        printf("✓ Converted: %s -> %s\n", filename, output_filename);
+    } else {
+        printf("!! Gagal membuat file gambar: %s\n", output_filename);
+    }
+
+    free(bin_data);
+
+}
+```
+Dimana untuk cara kerjanya sebagai berikut.
+1. Fungsi akan mengambil input berupa `*char filename`.
+2. Setelah itu, fungsi akan membuka filename terebut dalam mode read.
+3. Jika file tidak ada, maka muncul pesan `Gagal membuka file input`.
+4. Setelah itu, file menentukan ukuran (panjang) dari file yang sedang dibuka.
+5. Jika panjangnya <= 0, makka program akan muncul pesan `!! File kosong: %s`.
+6. Program memuat seluruh konten file heksadesimal ke dalam memori untuk pemrosesan lebih lanjut, dan kemudian menutup file tersebut.
+7. Program membersihkan data heksadesimal yang telah dibaca dari file (`hex_data`) dengan menghapus semua karakter newline (`\n`) dan carriage return (`\r`).
+8. Setelah itu, memori yang berisi hex_data dibersihkan untuk emnghindari terjadinya memory leak.
