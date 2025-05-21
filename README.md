@@ -319,4 +319,78 @@ Dimana untuk cara kerjanya sebagai berikut.
     -= Kode mencoba membuka file log bernama conversion.log (di dalam source_dir) dalam mode append ("a").
     - Jika file log berhasil dibuka, sebuah entri log yang berisi timestamp dan detail konversi (file input dan file output) ditulis ke dalamnya, lalu file log ditutup.
 23. Jika file output gagal dibuka, pesan kesalahan akan dicetak ke konsol.
-24. Terakhir, memori yang dialokasikan untuk `bin_data` dibebaskan.
+24. Terakhir, memori yang dialokasikan untuk `bin_data` dibebaskan untuk menghindari terjadinya memory leak.
+
+### c. Fungsi `is_converted`
+Fungsi ini berfungsi untuk memeriksa apakah file telah dikonversi sebelumnya berdasarkan pathnya. Untuk kodenya seperti ini.
+```
+static bool is_converted(const char *filepath) {
+    for (int i = 0; i < converted_count; i++) {
+        if (strcmp(converted_files[i], filepath) == 0)
+            return true;
+    }
+    return false;
+}
+```
+Untuk cara kerjanya yaitu mulanya fungsi mengiterasi daftar konversi, lalu membndingkan path dan pengembalian true jika ditemukan, false jika ditemukan.
+
+### d. Fungsi `mark_converted`
+Fungsi mark_converted berfungsi untuk menambahkan path sebuah file ke dalam daftar (cache) file yang telah berhasil dikonversi. Untuk kodenya seperti ini.
+```
+static void mark_converted(const char *filepath) {
+    if (converted_count < MAX_CONVERTED_FILES) {
+        strncpy(converted_files[converted_count], filepath, PATH_MAX);
+        converted_files[converted_count][PATH_MAX - 1] = '\0'; // safety null terminator
+        converted_count++;
+    }
+}
+```
+Untuk cara kerjanya sebagai berikut.
+1. Fungsi memeriksa apakah jumlah file yang sudah tercatat (`converted_count`) belum mencapai batas maksimum yang diizinkan (`MAX_CONVERTED_FILES`).
+2. Jika kapasitas belum penuh, path file yang diberikan (`filepath`) akan disalin ke lokasi kosong berikutnya dalam array `converted_files`.
+3. Setelah berhasil disalin, penghitung `converted_count` akan ditingkatkan satu untuk mencatat bahwa ada satu file lagi yang sudah ditandai.
+4. Jika kapasitas `MAX_CONVERTED_FILES` sudah tercapai, fungsi ini tidak melakukan apa pun dan tidak menambahkan path file baru.
+
+### e. `fs_getattr()`
+Fungsi ini digunakan untuk mendapatkan atribut dari sebuah file atau direktori, seperti tipe (file atau direktori), izin akses, ukuran, dan jumlah hard link. Untuk kodenya seperti ini
+```
+static int fs_getattr(const char *path, struct stat *st, struct fuse_file_info *fi) {
+    (void) fi;
+    char realpath[PATH_MAX];
+    snprintf(realpath, sizeof(realpath), "%s%s", source_dir, path);
+
+    printf("[getattr] path=%s, realpath=%s\n", path, realpath);
+
+    if (strcmp(path, "/") == 0) {
+        st->st_mode = S_IFDIR | 0755;
+        st->st_nlink = 2;
+        return 0;
+    }
+
+    struct stat temp_stat;
+    if (stat(realpath, &temp_stat) == -1)
+        return -ENOENT;
+
+    if (S_ISREG(temp_stat.st_mode)) {
+        st->st_mode = S_IFREG | 0444;
+        st->st_nlink = 1;
+        st->st_size = temp_stat.st_size;
+        return 0;
+    }
+
+    if (S_ISDIR(temp_stat.st_mode)) {
+        st->st_mode = S_IFDIR | 0755;
+        st->st_nlink = 2;
+        return 0;
+    }
+
+    return -ENOENT;
+}
+```
+dimana untuk cara kerjanya sebagai berikut.
+1. Fungsi ini menggabungkan source_dir (direktori sumber asli) dengan path (jalur yang diminta oleh sistem FUSE) untuk membentuk jalur file yang sebenarnya di sistem operasi.
+2. Jika path yang diminta adalah / (direktori root FUSE), fungsi ini secara langsung mengatur atributnya sebagai direktori dengan izin `0755`.
+3. Memeriksa Keberadaan File: Untuk path lainnya, fungsi ini mencoba mendapatkan atribut dari file atau direktori nyata menggunakan `stat()`. Jika tidak ditemukan, fungsi mengembalikan `-ENOENT`.
+4. Jika `stat()` berhasil, fungsi memeriksa apakah itu file biasa. Jika ya, atributnya diatur sebagai file dengan izin hanya baca (`0444`) dan ukurannya disalin.
+5. Jika itu direktori, atributnya diatur sebagai direktori dengan izin `0755`.
+6. Jika atribut berhasil ditentukan, fungsi mengembalikan 0 (berhasil). Jika tipe entri tidak didukung atau ada masalah lain, fungsi mengembalikan `-ENOENT`.
