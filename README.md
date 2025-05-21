@@ -472,3 +472,63 @@ dimana untuk cara kerjanya seperti ini.
 5. Fungsi memeriksa apakah file sudah dikonversi menggunakan fungsi `is_converted()`.
 6. ika belum dikonversi, fungsi memanggil fungsi `convert_to_image()` untuk mengubah konten heksadesimal file menjadi gambar. Setelah konversi, file tersebut ditandai sebagai sudah dikonversi menggunakan `mark_converted()`.
 7. Fungsi mengembalikan `0` untuk menandakan bahwa operasi pembukaan file berhasil.
+
+### `h. fs_read()`
+Fungsi ini digunakan untuk membaca sebuah file dalam FUSE. Untuk kodenya seperti ini
+```
+static int fs_read(const char *path, char *buf, size_t size, off_t offset,
+                   struct fuse_file_info *fi) {
+    (void) fi;
+
+    char fullpath[PATH_MAX];
+    snprintf(fullpath, sizeof(fullpath), "%s%s", source_dir, path);
+
+    printf("[read] path=%s, realpath=%s, size=%zu, offset=%ld\n", path, fullpath, size, offset);
+
+    int fd = open(fullpath, O_RDONLY);
+    if (fd == -1) return -errno;
+
+    int res = pread(fd, buf, size, offset);
+    if (res == -1) res = -errno;
+    close(fd);
+    return res;
+}
+```
+dimana untuk cara kerjanya sebagai berikut.
+1. Fungsi menggabungkan source_dir dan path FUSE untuk mendapatkan jalur file yang sebenarnya di sistem file fisik.
+2. Fungsi membuka file fisik dalam mode hanya-baca. Jika gagal, fungsi mengembalikan error.
+3. Fungsi membaca data dari file fisik dimulai dari offset tertentu dengan ukuran size yang diminta, lalu menyimpannya ke buffer yang disediakan (buf).
+4. Setelah membaca, fungsi menutup file yang telah dibuka.
+5. Fungsi mengembalikan jumlah byte yang berhasil dibaca, atau nilai error jika terjadi masalah selama pembacaan.
+
+### `i. Fuse Operations`
+Fungsi ini digunakan untuk menjalankan beberapa operasi yang diperlukan pada FUSE. Untuk kodenya seperti ini.
+```
+static struct fuse_operations fs_oper = {
+    .getattr = fs_getattr,
+    .readdir = x_readdir,
+    .open = fs_open,
+    .read = fs_read,
+};
+```
+
+### `j. int main()`
+Fungsi ini digunaka sebagai program utama. Untuk kodenya seperti ini.
+```
+int main(int argc, char *argv[]) {
+    char cwd[PATH_MAX];
+    if (getcwd(cwd, sizeof(cwd)) == NULL) {
+        perror("getcwd() error");
+        return 1;
+    }
+    snprintf(source_dir, sizeof(source_dir), "%s/anomali", cwd);
+    printf("Source directory set to: %s\n", source_dir);
+
+    return fuse_main(argc, argv, &fs_oper, NULL);
+}
+```
+Dimana cara kerjanya sebagai berikut.
+1. Program mencoba mendapatkan path direktori kerja saat ini (cwd) tempat program dijalankan.
+2. Jika gagal, program akan mencetak kesalahan dan keluar.
+3. Program membuat jalur absolut ke source_dir dengan menggabungkan direktori kerja saat ini dan sub-direktori "anomali".
+4. Program memulai FUSE filesystem, menyerahkan kontrol ke library FUSE dengan argumen command-line yang diterima (argc, argv) dan struktur operasi (fs_oper) yang mendefinisikan perilaku filesystem.
