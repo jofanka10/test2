@@ -532,3 +532,174 @@ Dimana cara kerjanya sebagai berikut.
 2. Jika gagal, program akan mencetak kesalahan dan keluar.
 3. Program membuat jalur absolut ke source_dir dengan menggabungkan direktori kerja saat ini dan sub-direktori "anomali".
 4. Program memulai FUSE filesystem, menyerahkan kontrol ke library FUSE dengan argumen command-line yang diterima (argc, argv) dan struktur operasi (fs_oper) yang mendefinisikan perilaku filesystem.
+
+
+## soal_2
+Pada soal ini, program dapat menyatukan beberapa file yang terpecah menjadi 14 bagian dengan format .000, .001, sampai .013.
+
+### `int_main()`
+Untuk kodenya seperti ini
+```
+int main(int argc, char *argv[]) {
+    char cwd[PATH_MAX];
+    if (getcwd(cwd, sizeof(cwd)) == NULL) {
+        perror("getcwd");
+        return 1;
+    }
+
+    snprintf(relics_dir, sizeof(relics_dir), "%s/relics", cwd);
+    snprintf(log_path, sizeof(log_path), "%s/activity.log", cwd);
+
+    umask(0);
+    return fuse_main(argc, argv, &baymax_oper, NULL);
+}
+```
+Dimana untuk cara kerjanya sebagai berikut.
+1. Fungsi ini mendapatkan direktori kerja saat ini untuk menentukan lokasi file-file penting.
+2. Jalur ke direktori relics dan file activity.log diatur berdasarkan direktori kerja tersebut.
+3. Izin default untuk file dan direktori baru disetel menggunakan umask(0).
+4. Terakhir, fungsi ini memulai sistem file FUSE dan menyerahkan kontrol ke library FUSE.
+
+### `write_log()`
+Untuk write log kodenya seperti ini
+```
+void write_log(const char *format, ...) {
+    FILE *logfile = fopen(log_path, "a");
+    if (!logfile) return;
+
+    time_t now = time(NULL);
+    struct tm *tm_info = localtime(&now);
+
+    char timebuf[64];
+    strftime(timebuf, sizeof(timebuf), "[%Y-%m-%d %H:%M:%S]", tm_info);
+
+    fprintf(logfile, "%s ", timebuf);
+
+    va_list args;
+    va_start(args, format);
+    vfprintf(logfile, format, args);
+    va_end(args);
+
+    fprintf(logfile, "\n");
+    fclose(logfile);
+}
+```
+Dimana untuk cara kerjanya seperti ini
+1. Fungsi ini membuka file log (activity.log) dalam mode append.
+2. Waktu saat ini diambil dan diformat menjadi timestamp.
+3. Timestamp tersebut ditulis ke file log, diikuti oleh pesan yang diformat.
+4. Akhirnya, file log ditutup untuk memastikan data tersimpan.
+
+### Fungsi `make_part_path()`
+Untuk kodenya seperti ini.
+```
+static void make_part_path(char *buf, size_t size, const char *filename, int index) {
+    snprintf(buf, size, "%s/%s.%03d", relics_dir, filename, index);
+}
+```
+Dimana cara kerja dari kode ini adalah fungsi ini membangun jalur lengkap ke file fragmen fisik dengan menggabungkan direktori relics, nama file virtual, dan indeks fragmen.
+
+### Fungsi `count_parts()`
+Untuk kodenya seperti ini.
+```
+static int count_parts(const char *filename) {
+    char part_path[PATH_MAX];
+    int count = 0;
+    while (count < MAX_PARTS) {
+        make_part_path(part_path, sizeof(part_path), filename, count);
+        if (access(part_path, F_OK) != 0) break;
+        count++;
+    }
+    return count;
+}
+```
+Dimana untuk cara kerjanya seperti ini.
+1. Fungsi ini melakukan iterasi untuk memeriksa keberadaan setiap fragmen file (misalnya .000, .001, dst.).
+2. Penghitungan fragmen berhenti saat file fragmen tidak ditemukan lagi.
+3. Jumlah total fragmen yang ditemukan dikembalikan.
+
+### fungsi `read_full_file()`
+Untuk kodenya seperti ini.
+```
+static int read_full_file(const char *filename, char *buf, size_t size, off_t offset) {
+    int part_count = count_parts(filename);
+    if (part_count == 0) return -ENOENT;
+
+    size_t total_size = part_count * MAX_PART_SIZE;
+    if (offset >= total_size) return 0;
+
+    size_t to_read = size;
+    if (offset + to_read > total_size)
+        to_read = total_size - offset;
+
+    size_t read_bytes = 0;
+    int part_index = offset / MAX_PART_SIZE;
+    off_t part_offset = offset % MAX_PART_SIZE;
+
+    while (to_read > 0 && part_index < part_count) {
+        char part_path[PATH_MAX];
+        make_part_path(part_path, sizeof(part_path), filename, part_index);
+
+        FILE *f = fopen(part_path, "rb");
+        if (!f) return -EIO;
+
+        if (fseek(f, part_offset, SEEK_SET) != 0) {
+            fclose(f);
+            return -EIO;
+        }
+
+        size_t can_read = MAX_PART_SIZE - part_offset;
+        if (can_read > to_read) can_read = to_read;
+
+        size_t n = fread(buf + read_bytes, 1, can_read, f);
+        fclose(f);
+
+        if (n == 0) break;
+
+        read_bytes += n;
+        to_read -= n;
+        part_index++;
+        part_offset = 0;
+    }
+    return read_bytes;
+}
+```
+Dimana untuk cara kerjanya seperti ini.
+1. Fungsi ini menentukan jumlah fragmen dan ukuran total file virtual.
+2. Jika offset berada di luar ukuran file, fungsi mengembalikan nol byte yang dibaca.
+3. Fungsi ini menghitung fragmen awal dan offset di dalamnya dari mana harus mulai membaca.
+4. Sebuah loop membuka setiap fragmen yang relevan, mencari posisi yang benar, dan membaca data ke dalam buffer yang disediakan.
+5. Loop melanjutkan ke fragmen berikutnya sampai semua data yang diminta terbaca atau tidak ada lagi fragmen.
+6. Jumlah total byte yang berhasil dibaca dikembalikan.
+
+### Fungsi `baymax_getattr()`
+Untuk kodenya seperti ini
+```
+static int baymax_getattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi) {
+    (void) fi;
+    memset(stbuf, 0, sizeof(struct stat));
+
+    if (strcmp(path, "/") == 0) {
+        stbuf->st_mode = S_IFDIR | 0755;
+        stbuf->st_nlink = 2;
+        return 0;
+    }
+
+    const char *filename = path + 1;
+    int parts = count_parts(filename);
+    if (parts == 0) return -ENOENT;
+
+    stbuf->st_mode = S_IFREG | 0644;
+    stbuf->st_nlink = 1;
+    stbuf->st_size = parts * MAX_PART_SIZE;
+    return 0;
+}
+```
+Dimana untuk cara kerjanya seperti ini.
+1. Fungsi ini menginisialisasi struktur atribut (stbuf) ke nol.
+2. Jika path adalah direktori root (/), atribut diatur untuk direktori (0755).
+3. Jika path adalah file, jumlah fragmen dihitung.
+4. Jika file tidak memiliki fragmen, fungsi mengembalikan error ENOENT.
+5. Atribut file (0644, ukuran total dari fragmen) diatur dan dikembalikan.
+
+
