@@ -533,6 +533,138 @@ Dimana cara kerjanya sebagai berikut.
 3. Program membuat jalur absolut ke source_dir dengan menggabungkan direktori kerja saat ini dan sub-direktori "anomali".
 4. Program memulai FUSE filesystem, menyerahkan kontrol ke library FUSE dengan argumen command-line yang diterima (argc, argv) dan struktur operasi (fs_oper) yang mendefinisikan perilaku filesystem.
 
+### Revisi
+Revisi pada soal ini terletak pada download file `anomali.zip`. Solusinya adalah menambahkan kode remmove dan download. Untuk kodenya seperti ini
+```
+int remove_directory_recursive(const char *path) {
+    DIR *d = opendir(path);
+    size_t path_len = strlen(path);
+    int r = 0; // 0 for success
+
+    if (!d) {
+        // Direktori tidak ada atau tidak dapat dibuka.
+        // Jika errno adalah ENOENT, berarti direktori memang tidak ada, jadi anggap berhasil "dihapus".
+        if (errno == ENOENT) return 0;
+        perror("opendir for recursive delete");
+        return -1;
+    }
+
+    struct dirent *p;
+    while ((p = readdir(d)) != NULL) {
+        // Lewati entri "." dan ".."
+        if (!strcmp(p->d_name, ".") || !strcmp(p->d_name, "..")) {
+            continue;
+        }
+
+        char *buf = NULL;
+        // Alokasikan buffer untuk path lengkap (path_lama/nama_file_baru)
+        size_t len = path_len + strlen(p->d_name) + 2; // +2 untuk '/' dan null terminator
+        buf = malloc(len);
+        if (!buf) {
+            perror("malloc for path buffer");
+            r = -1;
+            break;
+        }
+        snprintf(buf, len, "%s/%s", path, p->d_name);
+
+        struct stat st_entry;
+        if (stat(buf, &st_entry) == -1) {
+            perror("stat on entry for recursive delete");
+            free(buf);
+            r = -1;
+            break;
+        }
+
+        if (S_ISDIR(st_entry.st_mode)) { // Jika entri adalah direktori
+            if (remove_directory_recursive(buf) == -1) { // Panggil rekursif
+                r = -1;
+                free(buf);
+                break;
+            }
+        } else { // Jika entri adalah file
+            if (unlink(buf) == -1) { // Hapus file
+                perror("unlink file during recursive delete");
+                r = -1;
+                free(buf);
+                break;
+            }
+        }
+        free(buf);
+    }
+    closedir(d);
+
+    if (r == 0) { // Jika tidak ada kesalahan sejauh ini, coba hapus direktori itu sendiri
+        if (rmdir(path) == -1) {
+            perror("rmdir");
+            r = -1;
+        }
+    }
+
+    return r; // 0 jika berhasil, -1 jika ada kesalahan
+}
+
+// --- Fungsi Download Anomali ---
+void download()
+{
+    // Cek apakah folder 'anomali' sudah ada dan merupakan direktori
+    struct stat st_anomali_dir;
+    int anomali_dir_exists = (stat("anomali", &st_anomali_dir) == 0 && S_ISDIR(st_anomali_dir.st_mode));
+
+    // Cek apakah file 'anomali.zip' sudah ada dan merupakan file biasa
+    struct stat st_anomali_zip;
+    int anomali_zip_exists = (stat("anomali.zip", &st_anomali_zip) == 0 && S_ISREG(st_anomali_zip.st_mode));
+
+    bool proceed_with_download = true; // Asumsi default untuk melanjutkan
+
+    if (anomali_dir_exists || anomali_zip_exists) {
+        char response[10];
+        printf("File atau folder 'anomali' atau 'anomali.zip' sudah ada.\n");
+        printf("Apakah Anda ingin menggantinya? (y/n): ");
+        if (fgets(response, sizeof(response), stdin) == NULL) {
+            fprintf(stderr, "Gagal membaca input. Batalkan pengunduhan.\n");
+            proceed_with_download = false;
+        } else {
+            // Hapus karakter newline jika ada
+            response[strcspn(response, "\n")] = 0;
+            if (strcmp(response, "y") != 0 && strcmp(response, "Y") != 0) {
+                printf("Penggantian dibatalkan. Pengunduhan dilewati.\n");
+                proceed_with_download = false;
+            }
+        }
+    }
+
+    if (!proceed_with_download) {
+        return; // Keluar dari fungsi download jika tidak ada konfirmasi
+    }
+
+    // Jika folder 'anomali' sudah ada, hapus secara rekursif
+    if (anomali_dir_exists) {
+        printf("Menghapus folder 'anomali'...\n");
+        if (remove_directory_recursive("anomali") == -1) {
+            fprintf(stderr, "Gagal menghapus folder 'anomali'. Batalkan pengunduhan.\n");
+            return;
+        }
+        printf("Folder 'anomali' berhasil dihapus.\n");
+    }
+
+    if (!opendir("anomali.zip"))
+    {
+        pid_t pid_download = fork();
+        if (pid_download == 0)
+        {
+            char *download = "mkdir anomali && wget 'https://drive.google.com/uc?export=download&id=1hi_GDdP51Kn2JJMw02WmCOxuc3qrXzh5' -O anomali.zip && sudo unzip anomali.zip && rm anomali.zip";
+            char *argv_download[] = {"sh", "-c", download, NULL};
+            execv("/bin/sh", argv_download);
+        }
+        else if (pid_download > 0) wait(NULL);
+        else perror("fork");
+    }
+}
+```
+Dimana untuk cara kerjanya yaitu:
+1. Fungsi mengecek apakah di direktori saat ini ada folder `anomali.zip`.
+2. Jika ada, maka program muncul pesan agar folder tersebut ingin di-replace atau tidak.
+3. jika ya, maka program langsung me-replace folder anomali beserta isinya dengan download file yang sudah ditentukan.
 
 ## soal_2
 Pada soal ini, program dapat menyatukan beberapa file yang terpecah menjadi 14 bagian dengan format .000, .001, sampai .013. Selain itu, program dapat memindahkan file yang terpecah (langsung menjadi gambar) ke direktori lain. Program ini terbagi menjadi beberapa fungsi. Untuk fungsinya sebagai berikut.
