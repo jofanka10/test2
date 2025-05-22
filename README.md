@@ -673,7 +673,7 @@ Dimana untuk cara kerjanya seperti ini.
 6. Jumlah total byte yang berhasil dibaca dikembalikan.
 
 ### Fungsi `baymax_getattr()`
-Untuk kodenya seperti ini
+Fungsi ini digunakan untuk mendapatkan atribut file atau direktori, seperti tipe, izin, dan ukuran, yang diminta oleh kernel. Untuk kodenya seperti ini
 ```
 static int baymax_getattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi) {
     (void) fi;
@@ -702,4 +702,282 @@ Dimana untuk cara kerjanya seperti ini.
 4. Jika file tidak memiliki fragmen, fungsi mengembalikan error ENOENT.
 5. Atribut file (0644, ukuran total dari fragmen) diatur dan dikembalikan.
 
+### `baymax_readdir()`
+Fungsi ini digunakan untuk membaca isi direktori (dalam kasus ini, hanya direktori root) dan mengembalikan daftar file yang terlihat. Untuk kodenya seperti ini
+```
+static int baymax_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
+                          struct fuse_file_info *fi, enum fuse_readdir_flags flags) {
+    (void) offset; (void) fi; (void) flags;
 
+    if (strcmp(path, "/") != 0)
+        return -ENOENT;
+
+    filler(buf, ".", NULL, 0, 0);
+    filler(buf, "..", NULL, 0, 0);
+
+    DIR *d = opendir(relics_dir);
+    if (!d) return 0;
+
+    char lastname[512] = {0};
+    struct dirent *entry;
+    while ((entry = readdir(d)) != NULL) {
+        if (entry->d_name[0] == '.') continue;
+
+        int len = strlen(entry->d_name);
+        if (len < 4) continue;
+        if (entry->d_name[len - 4] != '.') continue;
+
+        char base[512];
+        strncpy(base, entry->d_name, len - 4);
+        base[len - 4] = '\0';
+
+        if (strcmp(base, lastname) != 0) {
+            if (filler(buf, base, NULL, 0, 0) != 0)
+                break;
+            strcpy(lastname, base);
+        }
+    }
+
+    closedir(d);
+    return 0;
+}
+```
+Dimana untuk cara kerjanya sebagai berikut.
+1. Fungsi ini hanya menangani pembacaan untuk direktori root (/); selain itu, ia mengembalikan error.
+2. Entri standar . dan .. ditambahkan ke buffer direktori.
+3. Fungsi ini membuka direktori relics untuk membaca file fragmen fisik.
+4. Sebuah loop membaca setiap entri di direktori relics.
+5. File-file yang bukan fragmen atau yang tersembunyi dilewati.
+6. Nama dasar file (tanpa ekstensi fragmen) diekstraksi dari nama fragmen.
+7. Hanya nama dasar file yang unik ditambahkan ke buffer yang akan dilihat oleh pengguna.
+8. Setelah selesai, direktori relics ditutup.
+
+### `baymax_open()`
+Fungsi ini digunakan ketika aplikasi pengguna mencoba membuka sebuah file. Untuk kodenya seperti ini.
+```
+static int baymax_open(const char *path, struct fuse_file_info *fi) {
+    const char *filename = path + 1;
+    int parts = count_parts(filename);
+    if (parts == 0) return -ENOENT;
+    return 0;
+}
+```
+Dimana untuk cara kerjanya seperti ini.
+1. Fungsi ini mengekstrak nama file virtual dari path.
+2. Jumlah fragmen file dihitung untuk memeriksa keberadaan file.
+3. Jika file tidak ditemukan (0 fragmen), fungsi mengembalikan error ENOENT.
+4. Jika file ditemukan, fungsi mengembalikan 0 untuk menandakan sukses.
+
+### `baymax_read()`
+Fungsi ini digunakan ketika aplikasi pengguna mencoba membaca data dari sebuah file. Untuk kodenya seperti ini.
+```
+static int baymax_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+    (void) fi;
+    const char *filename = path + 1;
+    int res = read_full_file(filename, buf, size, offset);
+    if (res >= 0) {
+        write_log("READ: %s", filename);
+    }
+    return res;
+}
+```
+Dimana untuk cara kerjanya seperti ini.
+1. Fungsi ini mengekstrak nama file virtual dari path.
+2. Fungsi helper read_full_file dipanggil untuk membaca data dari fragmen ke buffer yang disediakan.
+3. Jika pembacaan berhasil, aktivitas "READ" dicatat ke log.
+4. Hasil pembacaan (jumlah byte atau kode error) dikembalikan.
+
+### `baymax_create()`
+Fungsi ini digunakan ketika aplikasi pengguna mencoba membuat file baru. Untuk kodenya seperti ini.
+```
+static int baymax_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
+    (void) mode; (void) fi;
+    return 0;
+}
+```
+Dimana untuk cara kerjanya yaitu: Fungsi ini langsung mengembalikan 0 (sukses), lalu pembuatan fragmen file fisik ditunda hingga operasi penulisan terjadi.
+
+### `file_write_buffer()`
+Struktur dan fungsi-fungsi helper ini digunakan untuk mengelola buffer data di memori sementara file sedang ditulis, sebelum disimpan ke fragmen fisik. Untuk kodenya seperti ini.
+```
+struct file_write_buffer {
+    char *data;
+    size_t size;
+    size_t capacity;
+};
+
+static struct file_write_buffer *get_write_buffer(struct fuse_file_info *fi) {
+    return (struct file_write_buffer *)(uintptr_t)fi->fh;
+}
+
+static void set_write_buffer(struct fuse_file_info *fi, struct file_write_buffer *buf) {
+    fi->fh = (uint64_t)(uintptr_t)buf;
+}
+```
+Dimana untuk cara kerjanya seperti ini.
+1. Struktur file_write_buffer mendefinisikan buffer memori untuk menyimpan data file yang sedang ditulis.
+2. Fungsi get_write_buffer mengambil buffer tulis yang terkait dengan file handle FUSE.
+3. Fungsi set_write_buffer menyimpan buffer tulis ke dalam file handle FUSE.
+
+### `baymax_write()`
+Fungsi ini digunakan ketika aplikasi pengguna mencoba menulis data ke sebuah file. Untuk kodenya seperti ini.
+```
+static int baymax_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+    struct file_write_buffer *wb = get_write_buffer(fi);
+    if (!wb) {
+        wb = malloc(sizeof(struct file_write_buffer));
+        if (!wb) return -ENOMEM;
+        wb->data = NULL;
+        wb->size = 0;
+        wb->capacity = 0;
+        set_write_buffer(fi, wb);
+    }
+
+    size_t newsize = offset + size;
+    if (newsize > wb->capacity) {
+        size_t newcap = newsize + 1024;
+        char *newdata = realloc(wb->data, newcap);
+        if (!newdata) return -ENOMEM;
+        wb->data = newdata;
+        wb->capacity = newcap;
+    }
+
+    memcpy(wb->data + offset, buf, size);
+    
+    if (newsize > wb->size) wb->size = newsize;
+
+    return size;
+}
+```
+Dimana untuk cara kerjanya sebagai berikut.
+1. Fungsi ini mendapatkan atau mengalokasikan buffer tulis untuk file yang sedang dibuka.
+2. Jika buffer terlalu kecil, kapasitas buffer akan diperluas.
+3. Data yang diterima disalin ke dalam buffer memori.
+4. Ukuran data efektif di buffer diperbarui.
+5. Jumlah byte yang berhasil "ditulis" ke buffer dikembalikan.
+
+### `save_parts()`
+Fungsi ini bertanggung jawab untuk mengambil data dari buffer memori dan menulisnya ke fragmen-fragmen fisik di direktori relics. Untuk kodenya seperti ini
+```
+static int save_parts(const char *filename, const char *buf, size_t size) {
+    int parts = 0;
+    size_t offset = 0;
+
+    while (offset < size) {
+        size_t chunk = MAX_PART_SIZE;
+        if (size - offset < chunk) chunk = size - offset;
+
+        char part_path[PATH_MAX];
+        make_part_path(part_path, sizeof(part_path), filename, parts);
+
+        FILE *f = fopen(part_path, "wb");
+        if (!f) return -EIO;
+
+        size_t written = fwrite(buf + offset, 1, chunk, f);
+        fclose(f);
+        if (written != chunk) return -EIO;
+
+        parts++;
+        offset += chunk;
+    }
+
+    char part_path[PATH_MAX];
+    while (true) {
+        make_part_path(part_path, sizeof(part_path), filename, parts);
+        if (access(part_path, F_OK) != 0) break;
+        remove(part_path);
+        parts++;
+    }
+
+    return parts;
+}
+```
+Dimana untuk cara kerjanya seperti ini.
+1. Fungsi ini melakukan iterasi untuk menulis data ke fragmen-fragmen fisik.
+2. Setiap fragmen dibuka atau dibuat, dan data ditulis ke dalamnya.
+3. Setelah penulisan selesai, sebuah loop terpisah menghapus fragmen-fragmen lama yang mungkin melebihi ukuran file baru.
+4. Jumlah fragmen yang ditulis dikembalikan.
+
+### `baymax_release()`
+Fungsi ini digunakan ketika aplikasi pengguna selesai menggunakan file dan menutupnya. Ini adalah momen krusial untuk menyimpan data yang di-buffer ke disk. Untuk kodenya seperti ini.
+```
+static int baymax_release(const char *path, struct fuse_file_info *fi) {
+    struct file_write_buffer *wb = get_write_buffer(fi);
+    if (wb) {
+        const char *filename = path + 1;
+        int parts = save_parts(filename, wb->data, wb->size);
+        if (parts > 0) {
+            char part_list[4096] = {0};
+            for (int i = 0; i < parts; i++) {
+                char partname[256];
+                snprintf(partname, sizeof(partname), "%s.%03d", filename, i);
+                strcat(part_list, partname);
+                if (i != parts - 1) strcat(part_list, ", ");
+            }
+            write_log("WRITE: %s -> %s", filename, part_list);
+        }
+
+        free(wb->data);
+        free(wb);
+        set_write_buffer(fi, NULL);
+    }
+    return 0;
+}
+```
+Dimana untuk cara kerjanya seperti ini.
+1. Fungsi ini mendapatkan buffer tulis yang terkait dengan file.
+2. Jika ada buffer tulis, data dari buffer disimpan ke fragmen-fragmen fisik.
+3. Jika ada fragmen yang ditulis, aktivitas "WRITE" dicatat ke log.
+4. Memori yang dialokasikan untuk buffer dan datanya dibebaskan.
+5. Fungsi mengembalikan 0 untuk menandakan sukses.
+
+### `baymax_unlink()`
+Fungsi ini digunakan ketika aplikasi pengguna mencoba menghapus (menghubungkan) sebuah file dari sistem file. Untuk kodenya seperti ini.
+```
+static int baymax_unlink(const char *path) {
+    const char *filename = path + 1;
+    char part_path[PATH_MAX];
+    char part_list[4096] = {0};
+    int index = 0;
+
+    while (true) {
+        make_part_path(part_path, sizeof(part_path), filename, index);
+        if (access(part_path, F_OK) != 0) break;
+
+        char partname[64];
+        snprintf(partname, sizeof(partname), "%s.%03d", filename, index);
+        if (index > 0) strcat(part_list, ", ");
+        strcat(part_list, partname);
+
+        remove(part_path);
+        index++;
+    }
+
+    if (index > 0) {
+        write_log("DELETE: %s", part_list);
+    }
+
+    return 0;
+}
+```
+Dimana untuk cara kerjanya sebagai berikut.
+1. Fungsi ini mengambil nama file virtual yang akan dihapus.
+2. Sebuah loop menghapus semua fragmen fisik yang terkait dengan file tersebut.
+3. Nama-nama fragmen yang dihapus ditambahkan ke daftar untuk log.
+4. Jika ada fragmen yang dihapus, aktivitas "DELETE" dicatat ke log.
+5. Fungsi mengembalikan 0 untuk menandakan sukses.
+
+### Fuse Operations
+Struktur ini adalah inti dari FUSE, memetakan operasi sistem file standar ke fungsi-fungsi kustom yang diimplementasikan dalam Baymax. Untuk kodenya seperti ini.
+```
+static struct fuse_operations baymax_oper = {
+    .getattr = baymax_getattr,  // Mendapatkan atribut file/direktori.
+    .readdir = baymax_readdir,  // Membaca isi direktori.
+    .open    = baymax_open,     // Membuka file.
+    .read    = baymax_read,     // Membaca dari file.
+    .write   = baymax_write,    // Menulis ke file.
+    .create  = baymax_create,   // Membuat file baru.
+    .release = baymax_release,  // Melepaskan (menutup) file.
+    .unlink  = baymax_unlink,   // Menghapus file.
+};
+```
