@@ -535,33 +535,10 @@ Dimana cara kerjanya sebagai berikut.
 
 
 ## soal_2
-Pada soal ini, program dapat menyatukan beberapa file yang terpecah menjadi 14 bagian dengan format .000, .001, sampai .013.
-
-### `int_main()`
-Untuk kodenya seperti ini
-```
-int main(int argc, char *argv[]) {
-    char cwd[PATH_MAX];
-    if (getcwd(cwd, sizeof(cwd)) == NULL) {
-        perror("getcwd");
-        return 1;
-    }
-
-    snprintf(relics_dir, sizeof(relics_dir), "%s/relics", cwd);
-    snprintf(log_path, sizeof(log_path), "%s/activity.log", cwd);
-
-    umask(0);
-    return fuse_main(argc, argv, &baymax_oper, NULL);
-}
-```
-Dimana untuk cara kerjanya sebagai berikut.
-1. Fungsi ini mendapatkan direktori kerja saat ini untuk menentukan lokasi file-file penting.
-2. Jalur ke direktori relics dan file activity.log diatur berdasarkan direktori kerja tersebut.
-3. Izin default untuk file dan direktori baru disetel menggunakan umask(0).
-4. Terakhir, fungsi ini memulai sistem file FUSE dan menyerahkan kontrol ke library FUSE.
+Pada soal ini, program dapat menyatukan beberapa file yang terpecah menjadi 14 bagian dengan format .000, .001, sampai .013. Selain itu, program dapat memindahkan file yang terpecah (langsung menjadi gambar) ke direktori lain. Program ini terbagi menjadi beberapa fungsi. Untuk fungsinya sebagai berikut.
 
 ### `write_log()`
-Untuk write log kodenya seperti ini
+Fungsi ini digunakan untuk mencatat proses tertentu ke dalam file `activity.log`. Untuk write log kodenya seperti ini
 ```
 void write_log(const char *format, ...) {
     FILE *logfile = fopen(log_path, "a");
@@ -591,7 +568,7 @@ Dimana untuk cara kerjanya seperti ini
 4. Akhirnya, file log ditutup untuk memastikan data tersimpan.
 
 ### Fungsi `make_part_path()`
-Untuk kodenya seperti ini.
+Fungsi ini digunakan untuk membentuk jalur lengkap dan spesifik ke setiap fragmen (bagian) dari sebuah file virtual yang disimpan secara fisik di direktori relics. Ini memastikan setiap bagian file memiliki nama unik yang dapat diakses. Untuk kodenya seperti ini.
 ```
 static void make_part_path(char *buf, size_t size, const char *filename, int index) {
     snprintf(buf, size, "%s/%s.%03d", relics_dir, filename, index);
@@ -600,7 +577,7 @@ static void make_part_path(char *buf, size_t size, const char *filename, int ind
 Dimana cara kerja dari kode ini adalah fungsi ini membangun jalur lengkap ke file fragmen fisik dengan menggabungkan direktori relics, nama file virtual, dan indeks fragmen.
 
 ### Fungsi `count_parts()`
-Untuk kodenya seperti ini.
+Fungsi ini digunakan untuk menentukan berapa banyak fragmen file fisik yang ada untuk representasi sebuah file virtual. Ini penting untuk mengetahui ukuran total file virtual dan fragmen mana saja yang membentuknya. Untuk kodenya seperti ini.
 ```
 static int count_parts(const char *filename) {
     char part_path[PATH_MAX];
@@ -619,7 +596,7 @@ Dimana untuk cara kerjanya seperti ini.
 3. Jumlah total fragmen yang ditemukan dikembalikan.
 
 ### fungsi `read_full_file()`
-Untuk kodenya seperti ini.
+Fungsi ini digunakan untuk mengumpulkan dan membaca kembali seluruh konten sebuah file virtual dengan mengambil dan menggabungkan data dari semua fragmen fisiknya yang tersimpan di direktori relics, pada offset dan ukuran yang diminta. Untuk kodenya seperti ini.
 ```
 static int read_full_file(const char *filename, char *buf, size_t size, off_t offset) {
     int part_count = count_parts(filename);
@@ -981,3 +958,26 @@ static struct fuse_operations baymax_oper = {
     .unlink  = baymax_unlink,   // Menghapus file.
 };
 ```
+
+### `int_main()`
+Int main berfungsi sebagai jalan utama dari program. Untuk kodenya seperti ini.
+```
+int main(int argc, char *argv[]) {
+    char cwd[PATH_MAX];
+    if (getcwd(cwd, sizeof(cwd)) == NULL) {
+        perror("getcwd");
+        return 1;
+    }
+
+    snprintf(relics_dir, sizeof(relics_dir), "%s/relics", cwd);
+    snprintf(log_path, sizeof(log_path), "%s/activity.log", cwd);
+
+    umask(0);
+    return fuse_main(argc, argv, &baymax_oper, NULL);
+}
+```
+Dimana untuk cara kerjanya sebagai berikut.
+1. Fungsi ini mendapatkan direktori kerja saat ini untuk menentukan lokasi file-file penting.
+2. Jalur ke direktori relics dan file activity.log diatur berdasarkan direktori kerja tersebut.
+3. Izin default untuk file dan direktori baru disetel menggunakan umask(0).
+4. Terakhir, fungsi ini memulai sistem file FUSE dan menyerahkan kontrol ke library FUSE.
