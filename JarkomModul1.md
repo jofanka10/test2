@@ -14,8 +14,14 @@ Setelah itu, kita follow TCPnya, lalu kita find dengan kata kunci `.exe`.
 
 Lalu, kita akan mencari sha256 dari masing-masing file. Caranya yaitu dengna melakukan `File -> Export Objects -> SMB`, lalu muncul tampilan seperti di bawah, lalu save sebagai file exe.
 
-<img width="842" height="554" alt="Screenshot 2025-10-03 at 13 26 42" src="https://github.com/user-attachments/assets/951e7c58-8743-4ad5-b7da-3947c982d656" />
+<img width="838" height="554" alt="Screenshot 2025-10-03 at 13 31 43" src="https://github.com/user-attachments/assets/0337f759-f952-4d21-a20c-25d9278b79e4" />
 
+Setelah itu, kita coba cari code sha256 melalui terminal. Untuk command dan hasilnya seperti ini.
+<img width="1435" height="185" alt="Screenshot 2025-10-03 at 13 33 38" src="https://github.com/user-attachments/assets/2b993954-aede-436c-944b-cbfec2fa2750" />
+
+Lalu kita masukkan ke `nc 10.15.43.32 3405` sehingga mendapatkan flag. Untuk hasilnya seperti ini.
+
+<img width="1251" height="718" alt="Screenshot 2025-10-03 at 13 35 28" src="https://github.com/user-attachments/assets/0d2c405d-d05d-4be7-a384-c44e01761bea" />
 
 
 ## No. 19 
