@@ -5,7 +5,18 @@ Pada soal ini, kita akan mencari berapa banyak paket dalam file `.pcapng`. Untuk
 
 <img width="142" height="50" alt="Screenshot 2025-10-04 at 10 24 44" src="https://github.com/user-attachments/assets/a91ec772-41c8-4992-98ee-d8ac09b6f015" />
 
-Selanjutnya, kita akan 
+Selanjutnya, kita akan mencari username dan password yang berhasil login menggunakan `http.response.code==200 && !(http contains"Invalid")`.
+
+<img width="1141" height="153" alt="Screenshot 2025-10-04 at 13 00 36" src="https://github.com/user-attachments/assets/60888094-2037-4ead-819b-af451a201577" />
+
+Setelah itu, kita follow TCP untuk mendapatkan informasi username dan password. 
+
+<img width="981" height="531" alt="Screenshot 2025-10-04 at 13 02 21" src="https://github.com/user-attachments/assets/ff6b3bdc-a95b-49e2-ae94-95b78411fc69" />
+
+Dari gambar tersebut, ada informasi stream di bawah kanan dan tools yang digunakan untuk brute force. Setelah kita dapatkan datanya, kita langsung saja masukkan ke `nc 10.15.43.32 3401`. Setelah kita memasukkan datanya ke sana, kita mendapatkan sebuah flag.
+
+![Uploading Screenshot 2025-10-04 at 13.13.05.png…]()
+
 
 ## No. 16
 Pada soal ini, kita akan mencari username dan password yang ada pada file pcap.
