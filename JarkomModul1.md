@@ -1,6 +1,36 @@
-[01/10/25, 22.00.02] Jofanka Al Kautsar P A: ‎Read more
-[01/10/25, 23.33.40] Jofanka Al Kautsar P A: ## No. 14
-Pada soal ini, praktikan diminta untuk mencari jumlah packet. Jumlah packetnya adalah 
+
+
+## No. 14
+Pada soal ini, kita akan mencari berapa banyak paket dalam file `.pcapng`. Untuk mencarinya kita hanya perlu melihat bagian bawah dari Wireshark. Untuk tampilannya seperti ini.
+
+<img width="142" height="50" alt="Screenshot 2025-10-04 at 10 24 44" src="https://github.com/user-attachments/assets/a91ec772-41c8-4992-98ee-d8ac09b6f015" />
+
+Selanjutnya, kita akan 
+
+## No. 16
+Pada soal ini, kita akan mencari username dan password yang ada pada file pcap.
+<img width="1470" height="859" alt="Screenshot 2025-10-04 at 07 44 18" src="https://github.com/user-attachments/assets/1e496a5c-8491-4219-8631-9b3b699b626a" />
+
+Lalu, kita akan mencari file-file yang ada di dalamnya. Jika dilihat dari hasil follow TCPnya, kita dapat menemukan lima file.
+
+![Desain tanpa judul_2](https://github.com/user-attachments/assets/02b5bfa4-8bb5-4c7c-8ac6-aa9bee7586a0)
+
+Setelah itu, kita akan mencari sha256 dari 5 file. Kita menggunakan q.exe di sini menggunakan fitur find di Wireshark.
+
+<img width="1419" height="302" alt="Screenshot 2025-10-04 at 07 54 57" src="https://github.com/user-attachments/assets/0feec6b3-0c6e-4fb8-9124-c7fea509eba4" />
+
+Setelah itu, kita follow TCP stream, lalu ubah tampilan datanya menjadi `RAW`. Setelah itu kita save as `.exe`.
+
+<img width="1409" height="529" alt="Screenshot 2025-10-04 at 07 58 08" src="https://github.com/user-attachments/assets/cb6bf51d-8a99-4dd0-a089-ed4fa6137c6e" />
+
+Kita buka terminal, lalu kita command `sha256 <namafile>`. Untuk hasilnya seperti ini.
+
+<img width="1397" height="388" alt="Screenshot 2025-10-04 at 08 00 02" src="https://github.com/user-attachments/assets/6eddc8e8-c284-4412-9707-1a1a499321b0" />
+
+Setelah semua datanya kita dapatkan, kita masukkan ke `nc 10.15.43.32 3403`. Untuk hasilnya seperti ini.
+
+<img width="969" height="713" alt="Screenshot 2025-10-04 at 08 00 57" src="https://github.com/user-attachments/assets/67c368d9-3049-4ac5-b12e-7eead395486d" />
+
 ## No. 18
 Pada soal ini, kita akan mencari berapa file yang mengandung malware, dan ditemukan ada dua file.
 
